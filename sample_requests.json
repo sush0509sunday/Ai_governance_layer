@@ -1,0 +1,22 @@
+[
+  "help my account isn't working and I can't log in",
+  "can you review this pull request #482 for the auth module",
+  "how many active users did we have last week",
+  "generate a report summarizing this quarter's support tickets",
+  "draft an email to the vendor about the delayed shipment",
+  "automate the weekly sync job for the billing pipeline",
+  "I'm having trouble with the checkout flow, it's broken",
+  "please review this diff before I merge it",
+  "look up the record for order 88213",
+  "write up the results from last month's A/B test",
+  "compose a message to the team about the outage",
+  "schedule a recurring job to clean up stale sessions",
+  "what is the value of total refunds this month",
+  "the payment error keeps happening, please help",
+  "summarize the incident postmortem for leadership",
+  "draft a welcome message for new users",
+  "trigger the nightly reconciliation job",
+  "does this refactor look right to you",
+  "find the record for customer ID 5521",
+  "quarterly summary of infrastructure spend"
+]

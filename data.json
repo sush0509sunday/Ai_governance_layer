@@ -1,0 +1,48 @@
+{
+  "summaries": [
+    {
+      "task_type": "code_review",
+      "task_count": 3,
+      "total_cost_usd": 0.0238,
+      "avg_cost_per_task": 0.0079,
+      "estimated_avoided_cost_usd": 0.03
+    },
+    {
+      "task_type": "workflow_automation",
+      "task_count": 3,
+      "total_cost_usd": 0.016,
+      "avg_cost_per_task": 0.0053,
+      "estimated_avoided_cost_usd": 0.02
+    },
+    {
+      "task_type": "content_drafting",
+      "task_count": 3,
+      "total_cost_usd": 0.0139,
+      "avg_cost_per_task": 0.0046,
+      "estimated_avoided_cost_usd": 0.02
+    },
+    {
+      "task_type": "report_generation",
+      "task_count": 3,
+      "total_cost_usd": 0.0114,
+      "avg_cost_per_task": 0.0038,
+      "estimated_avoided_cost_usd": 0.02
+    },
+    {
+      "task_type": "data_lookup",
+      "task_count": 4,
+      "total_cost_usd": 0.001,
+      "avg_cost_per_task": 0.0003,
+      "estimated_avoided_cost_usd": 0.0
+    },
+    {
+      "task_type": "support_query",
+      "task_count": 4,
+      "total_cost_usd": 0.001,
+      "avg_cost_per_task": 0.0002,
+      "estimated_avoided_cost_usd": 0.0
+    }
+  ],
+  "total_cost_usd": 0.0672,
+  "total_estimated_avoided_cost_usd": 0.09
+}
