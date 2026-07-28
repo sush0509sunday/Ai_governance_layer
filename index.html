@@ -2,32 +2,49 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>AI Task Governance Dashboard</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <style>
-  :root { --accent: #2E5C8A; --bg: #f7f8fa; --card: #ffffff; --text: #1a1a1a; --muted: #666; }
+  :root { --accent: #2E5C8A; --bg: #f7f8fa; --card: #fff; --text: #1a1a1a; --muted: #666; --warn: #a33; }
   * { box-sizing: border-box; }
   body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 32px; }
   h1 { font-size: 22px; margin-bottom: 4px; }
-  p.sub { color: var(--muted); margin-top: 0; margin-bottom: 28px; font-size: 14px; }
-  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; max-width: 1000px; }
-  .card { background: var(--card); border-radius: 10px; padding: 20px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
-  .card h2 { font-size: 15px; margin: 0 0 12px 0; color: var(--accent); }
-  .totals { display: flex; gap: 16px; margin-bottom: 24px; max-width: 1000px; }
-  .stat { background: var(--card); border-radius: 10px; padding: 16px 20px; flex: 1; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
-  .stat .label { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.03em; }
-  .stat .value { font-size: 24px; font-weight: 700; color: var(--text); margin-top: 4px; }
+  p.sub { color: var(--muted); margin: 0 0 28px; font-size: 14px; }
+  .wrap { max-width: 1000px; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  .card { background: var(--card); border-radius: 10px; padding: 20px; box-shadow: 0 1px 4px rgba(0,0,0,.08); }
+  .card h2 { font-size: 15px; margin: 0 0 12px; color: var(--accent); }
+  .totals { display: flex; gap: 16px; margin-bottom: 24px; flex-wrap: wrap; }
+  .stat { background: var(--card); border-radius: 10px; padding: 16px 20px; flex: 1; min-width: 180px; box-shadow: 0 1px 4px rgba(0,0,0,.08); }
+  .stat .label { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .03em; }
+  .stat .value { font-size: 24px; font-weight: 700; margin-top: 4px; }
+  .stat .tag { font-size: 11px; color: var(--muted); margin-top: 2px; }
   .note { font-size: 12px; color: var(--muted); margin-top: 24px; max-width: 640px; line-height: 1.5; }
+  .err { color: var(--warn); }
 </style>
 </head>
 <body>
+<div class="wrap">
   <h1>AI Task Governance — Demo Dashboard</h1>
-  <p class="sub">Illustrative output from <code>examples/demo.py</code>. Run the script to regenerate <code>data.json</code> with fresh sample data.</p>
+  <p class="sub">Illustrative output from <code>examples/demo.py</code>. Re-run it to regenerate <code>data.json</code>.</p>
 
   <div class="totals">
-    <div class="stat"><div class="label">Total governed cost</div><div class="value" id="totalCost">–</div></div>
-    <div class="stat"><div class="label">Est. avoided cost</div><div class="value" id="totalAvoided">–</div></div>
-    <div class="stat"><div class="label">Task types tracked</div><div class="value" id="typeCount">–</div></div>
+    <div class="stat">
+      <div class="label">Total governed cost</div>
+      <div class="value" id="totalCost">–</div>
+      <div class="tag">measured from token usage</div>
+    </div>
+    <div class="stat">
+      <div class="label">Est. avoided cost</div>
+      <div class="value" id="totalAvoided">–</div>
+      <div class="tag">PROJECTION — not measured</div>
+    </div>
+    <div class="stat">
+      <div class="label">Task types tracked</div>
+      <div class="value" id="typeCount">–</div>
+      <div class="tag">cost attribution grain</div>
+    </div>
   </div>
 
   <div class="grid">
@@ -42,12 +59,18 @@
   </div>
 
   <p class="note">
-    "Estimated avoided cost" is modeled using an illustrative multiplier (see
-    <code>src/cost_governor.py</code>) representing the combined effect of redundant
-    context, no semantic caching, and no model-tier routing. This is a placeholder for
-    demonstration — a real deployment would replace it with a measured before/after
+    "Estimated avoided cost" is modeled with an illustrative multiplier (see
+    <code>src/cost_governor.py</code>) standing in for redundant context, absent
+    semantic caching, and no model-tier routing. It is a <strong>projection, not a
+    measured result</strong>. A real deployment replaces it with a before/after
     comparison against actual historical spend.
   </p>
+  <p class="note">
+    This page reads the legacy <code>data.json</code> payload. The full versioned
+    contract — including per-tag rollups, budget alerts and the decision log — is
+    written to <code>governance_export.json</code>; see <code>docs/EXPORT_SCHEMA.md</code>.
+  </p>
+</div>
 
 <script>
 fetch('data.json')
@@ -69,19 +92,16 @@ fetch('data.json')
 
     new Chart(document.getElementById('avoidedChart'), {
       type: 'bar',
-      data: {
-        labels,
-        datasets: [
-          { label: 'Governed cost', data: costs, backgroundColor: '#2E5C8A' },
-          { label: 'Est. avoided cost', data: avoided, backgroundColor: '#C9D8E8' },
-        ]
-      },
+      data: { labels, datasets: [
+        { label: 'Governed cost', data: costs, backgroundColor: '#2E5C8A' },
+        { label: 'Est. avoided (projection)', data: avoided, backgroundColor: '#C9D8E8' }
+      ]},
       options: { responsive: true, scales: { x: { stacked: true }, y: { stacked: true } } }
     });
   })
   .catch(() => {
-    document.body.insertAdjacentHTML('beforeend',
-      '<p style="color:#a33;">Could not load data.json — run <code>python -m examples.demo</code> first, then serve this folder with a local web server (fetch() needs http:// not file://).</p>');
+    document.querySelector('.wrap').insertAdjacentHTML('beforeend',
+      '<p class="note err">Could not load data.json — run <code>python -m examples.demo</code> first, then serve this folder over http:// (fetch() will not work from file://).</p>');
   });
 </script>
 </body>
