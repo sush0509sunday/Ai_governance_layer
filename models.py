@@ -69,6 +69,10 @@ class PriceTable:
     Input and output tokens are commonly priced very differently (output
     is typically several times more expensive), which is why cost
     governance can't just count tokens — it has to weight them correctly.
+
+    Rates here are illustrative round numbers chosen to show the shape of
+    the tiering, not any specific vendor's current price list. Replace
+    `rates` with live pricing pulled from your providers.
     """
 
     # (input_price_per_million, output_price_per_million), in USD
@@ -86,7 +90,18 @@ class PriceTable:
 
 @dataclass
 class GovernedTask:
-    """A single request as it flows through the governance layer end to end."""
+    """A single request as it flows through the governance layer end to end.
+
+    `tags` is deliberately an open string->string map that the engine
+    never interprets. Callers use it to attach whatever dimensions their
+    organization cares about — team, initiative, environment, cost
+    center. The governance layer attributes cost against those tags and
+    passes them through to the export contract, but it takes no opinion
+    on what they mean. That keeps this engine reusable across
+    organizations with different structures, and lets a downstream
+    consumer (dashboard, FinOps tool, chargeback system) do the
+    strategic interpretation.
+    """
 
     task_id: str
     raw_text: str
@@ -95,4 +110,5 @@ class GovernedTask:
     execution_mode: ExecutionMode = ExecutionMode.UNGOVERNED_MANUAL
     token_usage: Optional[TokenUsage] = None
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    tags: dict[str, str] = field(default_factory=dict)
     metadata: dict = field(default_factory=dict)
