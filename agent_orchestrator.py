@@ -201,3 +201,39 @@ def escalation_sensitivity(
             "baseline_rate": round(baseline / total, 4),
         })
     return rows
+
+
+def confidence_histogram(
+    classifier: BaseClassifier,
+    texts: list[str],
+    bin_width: float = 0.05,
+) -> list[dict]:
+    """Count requests per confidence bin, to see where confidence clusters.
+
+    Read it next to `escalation_sensitivity`. A threshold that falls in
+    an empty stretch between clusters is stable; a threshold that falls
+    on a populated bin moves every request in that bin at once. Keyword
+    and other count-based classifiers emit only a few distinct scores, so
+    their histogram is a handful of spikes and any threshold behaves like
+    a step function.
+
+    Returns one row per bin from 0.0 to 1.0: `bin_start`, `bin_end`, `count`.
+    """
+    if not 0 < bin_width <= 1:
+        raise ValueError("bin_width must be in (0, 1]")
+
+    bin_count = round(1 / bin_width)
+    counts = [0] * bin_count
+    for text in texts:
+        confidence = classifier.classify(text).confidence
+        index = min(int(confidence / bin_width + 1e-9), bin_count - 1)
+        counts[index] += 1
+
+    return [
+        {
+            "bin_start": round(i * bin_width, 4),
+            "bin_end": round((i + 1) * bin_width, 4),
+            "count": counts[i],
+        }
+        for i in range(bin_count)
+    ]

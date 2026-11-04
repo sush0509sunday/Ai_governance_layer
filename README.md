@@ -101,6 +101,9 @@ python -m examples.demo
 # Enterprise scenario: two initiatives, one governance layer
 python -m examples.enterprise_demo
 
+# Where classifier confidence clusters (histogram + sensitivity sweep)
+python -m examples.confidence_histogram
+
 # Test suite
 pytest tests/ -v
 
@@ -120,7 +123,7 @@ downstream knows or cares which is running.
 | `RuleBasedClassifier` | keyword / regex | deterministic, free, instant | brittle to novel phrasing |
 | `EmbeddingClassifier` | cosine similarity | catches paraphrases | needs embedding infra in production |
 | `LLMClassifier` | model call | handles genuinely novel input | latency + per-call cost |
-| `EnsembleClassifier` | majority vote | disagreement lowers confidence, which drives escalation | runs several backends |
+| `EnsembleClassifier` | majority vote, optional per-backend calibration | disagreement lowers confidence, which drives escalation | runs several backends |
 
 ```python
 from src import EnsembleClassifier, RuleBasedClassifier, EmbeddingClassifier, AgentOrchestrator
@@ -169,8 +172,61 @@ threshold   manual    escalated   baseline
 0.90        10%       50%         40%
 ```
 
-Escalation jumps from 0% to 45% between 0.75 and 0.80. Pick a threshold sitting in a
-*gap* between clusters, calibrated on real traffic — not a round number.
+Escalation jumps from 0% to 45% between 0.75 and 0.80. These numbers come from the
+20 synthetic requests in `data/sample_requests.json`, scored by the keyword
+classifier, so treat them as an illustration of the behavior rather than a benchmark.
+
+Part of the reason is structural. `RuleBasedClassifier` scores 0.5 + 0.15 per matched
+signal, capped at 0.97, so its confidence takes only a few distinct values. A threshold
+between two of them changes nothing; one that crosses a value moves every request at
+that value at once. `confidence_histogram()` shows where confidence clusters:
+
+```bash
+python -m examples.confidence_histogram
+```
+
+It prints the histogram next to the sensitivity sweep, and also writes
+`dashboard/confidence_histogram.png` if matplotlib is installed (optional; the
+library itself has no dependencies). Pick a threshold sitting in a *gap* between
+clusters, measured on your own traffic, not a round number.
+
+## Combining classifiers: calibrate, don't average
+
+Backends score on different scales: a cosine-similarity classifier reports lower
+numbers than a keyword classifier for the same correct answer. Averaging raw scores
+lets the lowest-scaled backend veto agreement; in a pilot this escalated roughly 60%
+of traffic. You can reproduce it with `EnsembleClassifier(..., combine="mean")`: on the
+bundled sample requests at the 0.75 threshold, averaging sends 55% of requests to the
+upgraded tier and the other 45% to human review, versus 90% on the cheap tier with the
+default rule. Taking the max avoids the trap, but the result still isn't a probability.
+
+The robust fix is to calibrate each backend on labeled requests first, so a score of
+0.8 means "right about 80% of the time" everywhere:
+
+```python
+from src import EnsembleClassifier, IsotonicCalibrator, RuleBasedClassifier, EmbeddingClassifier
+
+rule_cal = IsotonicCalibrator().fit(rule_scores, rule_was_correct)
+emb_cal = IsotonicCalibrator().fit(embedding_scores, embedding_was_correct)
+
+classifier = EnsembleClassifier(
+    [RuleBasedClassifier(), EmbeddingClassifier()],
+    calibrators=[rule_cal, emb_cal],
+)
+```
+
+With calibrators, unanimous agreement is combined as P(at least one backend is
+right), an upper bound that assumes independent errors, and split votes are averaged
+and penalized. Without calibrators the ensemble keeps its original behavior
+(strongest score plus a consensus bonus). `IsotonicCalibrator` is a dependency-free
+isotonic regression (pool-adjacent-violators).
+
+The independence assumption rarely holds: a keyword and an embedding classifier read
+the same words, so they tend to fail on the same requests and the combined score runs
+high. Check it with `reliability_table(classifier, texts, labels)` on held-out labeled
+requests, which compares mean confidence with actual accuracy per band. If the gap is
+large, fit a calibrator on the ensemble's own combined scores and pass it as
+`final_calibrator=`.
 
 ## Tags: cost attribution without an opinion
 
@@ -250,21 +306,23 @@ Ai_governance_layer/
 ├── src/
 │   ├── models.py               # TaskType, GovernedTask, TokenUsage, PriceTable
 │   ├── task_classifier.py      # 4 interchangeable classifier backends
-│   ├── agent_orchestrator.py   # routing policy, escalation, overlap detection
+│   ├── calibration.py          # IsotonicCalibrator for per-backend calibration
+│   ├── agent_orchestrator.py   # routing policy, escalation, sensitivity + histogram diagnostics
 │   ├── token_tracker.py        # cost attribution by task type and tag
 │   ├── cost_governor.py        # budgets, alerts, avoided-cost modeling
 │   ├── observability.py        # decision log + routing-health metrics
 │   └── governance_export.py    # versioned contract (ExportBuilder / GovernanceFeed)
 ├── examples/
 │   ├── demo.py                 # end-to-end single-tenant run
-│   └── enterprise_demo.py      # two initiatives, portfolio rollup, exceptions
+│   ├── enterprise_demo.py      # two initiatives, portfolio rollup, exceptions
+│   └── confidence_histogram.py # where classifier confidence clusters
 ├── dashboard/
 │   └── index.html              # Chart.js visualization of governance data
 ├── docs/
 │   └── EXPORT_SCHEMA.md        # the integration contract
-├── tests/                      # 69 tests across all modules
+├── tests/                      # 84 tests across all modules
 ├── data/                       # synthetic sample requests
-└── .github/workflows/tests.yml # CI on Python 3.10 / 3.11 / 3.12
+└── .github/workflows/tests.yml # CI on Python 3.10 – 3.13
 ```
 
 ## License

@@ -231,26 +231,64 @@ class EnsembleClassifier(BaseClassifier):
     majority vote on task type, and derives confidence from how much the
     backends agreed.
 
-    One subtlety worth stating, because getting it wrong quietly breaks
-    the cost case: confidence across unanimous backends is combined with
-    `max`, not `mean`. Different backends score on different scales — a
-    cosine-similarity classifier structurally reports lower numbers than
-    a keyword classifier for the same correct answer. Averaging lets the
-    lowest-scaled backend veto a unanimous result, which drives
-    confidence under the escalation threshold and sends most traffic to
-    a pricier model tier. A governance layer that escalates the majority
-    of requests costs *more* than no governance at all, so unanimous
-    agreement is scored on its strongest evidence. Disagreement still
-    penalizes: a split vote falls back to the mean of the agreeing
-    backends, scaled by how large the majority was.
+    Different backends score on different scales: a cosine-similarity
+    classifier structurally reports lower numbers than a keyword
+    classifier for the same correct answer. Averaging raw scores lets the
+    lowest-scaled backend veto a unanimous result, which pushes confidence
+    under the escalation threshold and sends most traffic to a pricier
+    model tier. In a pilot, averaging escalated roughly 60% of traffic.
+
+    Two combination modes are supported:
+
+    * **Calibrated (recommended).** Pass one calibrator per backend (for
+      example `IsotonicCalibrator` fitted on labeled requests). Each raw
+      score is mapped to an empirical probability of being correct first.
+      Unanimous agreement is combined as P(at least one backend is right),
+      which assumes independent errors and is therefore an upper bound.
+      A split vote averages the agreeing calibrated scores and penalizes
+      by the size of the majority. Backends that read the same words tend
+      to fail on the same requests, so this combined score can still run
+      high. Check it with `reliability_table()` on held-out labeled data
+      and, if it is overconfident, pass `final_calibrator` (fitted on the
+      ensemble's own combined scores) to correct it as a last step.
+    * **Uncalibrated (legacy default).** Without calibrators, unanimous
+      agreement takes the strongest raw score plus a small consensus
+      bonus. This avoids the averaging trap but the result is still not a
+      probability, so prefer calibrated mode once labeled data exists.
+    * **Mean (anti-pattern, for comparison only).** `combine="mean"`
+      averages raw scores even when backends agree. It exists so the
+      averaging trap can be reproduced: on the bundled sample requests at
+      the default 0.75 threshold it escalates 55% of traffic and sends the
+      remaining 45% to human review.
+
+    Confidence is always capped at `max_confidence`.
     """
 
     method_name = "ensemble"
 
-    def __init__(self, classifiers: list[BaseClassifier]):
+    def __init__(
+        self,
+        classifiers: list[BaseClassifier],
+        calibrators: list[Callable[[float], float]] | None = None,
+        max_confidence: float = 0.97,
+        combine: str = "max_bonus",
+        final_calibrator: Callable[[float], float] | None = None,
+    ):
         if not classifiers:
             raise ValueError("EnsembleClassifier needs at least one backing classifier")
+        if calibrators is not None and len(calibrators) != len(classifiers):
+            raise ValueError("Provide exactly one calibrator per classifier, or none")
         self._classifiers = classifiers
+        if combine not in ("max_bonus", "mean"):
+            raise ValueError("combine must be 'max_bonus' or 'mean'")
+        self._calibrators = calibrators
+        self._max_confidence = max_confidence
+        self._combine = combine
+        self._final_calibrator = final_calibrator
+
+    @property
+    def is_calibrated(self) -> bool:
+        return self._calibrators is not None
 
     def classify(self, raw_text: str) -> ClassificationResult:
         results = [c.classify(raw_text) for c in self._classifiers]
@@ -260,15 +298,37 @@ class EnsembleClassifier(BaseClassifier):
         agreeing = [r for r in results if r.task_type == winner]
         agreement_ratio = vote_count / len(results)
 
-        if agreement_ratio == 1.0:
-            # Unanimous: trust the strongest evidence, plus a consensus bonus.
+        if self._calibrators is not None:
+            calibrated = [
+                cal(r.confidence)
+                for cal, r in zip(self._calibrators, results)
+                if r.task_type == winner
+            ]
+            if agreement_ratio == 1.0:
+                miss_probability = 1.0
+                for p in calibrated:
+                    miss_probability *= 1.0 - p
+                confidence = 1.0 - miss_probability
+            else:
+                confidence = (sum(calibrated) / len(calibrated)) * agreement_ratio
+        elif agreement_ratio == 1.0 and self._combine == "mean":
+            # Anti-pattern kept for comparison: lets the lowest-scaled
+            # backend drag a unanimous result down.
+            confidence = sum(r.confidence for r in agreeing) / len(agreeing)
+        elif agreement_ratio == 1.0:
+            # Legacy: trust the strongest evidence, plus a consensus bonus.
             confidence = max(r.confidence for r in agreeing) + 0.1
         else:
             # Split: average the agreeing backends and penalize by margin.
             mean_confidence = sum(r.confidence for r in agreeing) / len(agreeing)
             confidence = mean_confidence * agreement_ratio
 
-        confidence = round(min(confidence, 0.97), 2)
+        if self._final_calibrator is not None:
+            # Calibrate the combined score itself. This absorbs correlated
+            # errors between backends that per-backend calibration misses.
+            confidence = self._final_calibrator(confidence)
+
+        confidence = round(min(confidence, self._max_confidence), 2)
 
         merged_signals = [s for r in agreeing for s in r.matched_signals]
         merged_scores: dict[TaskType, float] = {}
