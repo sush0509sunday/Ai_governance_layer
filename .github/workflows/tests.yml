@@ -25,3 +25,4 @@ jobs:
           python -m examples.demo
           python -m examples.enterprise_demo
           python -m examples.confidence_histogram
+          python -m examples.jira_routing_demo

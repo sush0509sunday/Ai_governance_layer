@@ -30,6 +30,9 @@ class TaskType(str, Enum):
     REPORT_GENERATION = "report_generation"
     CONTENT_DRAFTING = "content_drafting"
     WORKFLOW_AUTOMATION = "workflow_automation"
+    BUG_TRIAGE = "bug_triage"
+    DOCUMENTATION = "documentation"
+    TEST_GENERATION = "test_generation"
     UNCLASSIFIED = "unclassified"
 
 

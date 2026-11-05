@@ -46,6 +46,9 @@ _ROUTING_POLICY: dict[TaskType, str] = {
     TaskType.REPORT_GENERATION: "mid-tier-model",
     TaskType.CODE_REVIEW: "frontier-model",
     TaskType.WORKFLOW_AUTOMATION: "mid-tier-model",
+    TaskType.BUG_TRIAGE: "mid-tier-model",
+    TaskType.DOCUMENTATION: "small-fast-model",
+    TaskType.TEST_GENERATION: "mid-tier-model",
     TaskType.UNCLASSIFIED: "frontier-model",  # be conservative when unsure
 }
 

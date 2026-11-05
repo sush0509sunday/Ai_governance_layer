@@ -1,0 +1,14 @@
+[
+  {"work_item": {"key": "SUP-101", "issue_type": "Service Request", "project": "SUPPORT", "component": "accounts", "requester": "maya"}, "prompt": "customer can't log in after resetting their password, please help"},
+  {"work_item": {"key": "SUP-102", "issue_type": "Service Request", "project": "SUPPORT", "component": "accounts", "requester": "maya"}, "prompt": "how many active users did we have last week"},
+  {"work_item": {"key": "SUP-103", "issue_type": "Service Request", "project": "SUPPORT", "component": "accounts", "requester": "maya"}, "prompt": "please review this pull request #519 and check the error handling in the diff"},
+  {"work_item": {"key": "CHECKOUT-210", "issue_type": "Bug", "project": "CHECKOUT", "component": "search", "requester": "liam"}, "prompt": "search results page throws an error when the filter is empty"},
+  {"work_item": {"key": "CHECKOUT-211", "issue_type": "Bug", "project": "CHECKOUT", "component": "billing", "requester": "liam"}, "prompt": "invoice totals are off by one cent on refunds, find the cause"},
+  {"work_item": {"key": "CHECKOUT-212", "issue_type": "Bug", "project": "CHECKOUT", "component": "search", "requester": "liam"}, "prompt": "URGENT complex production issue: typo in the search box placeholder text"},
+  {"work_item": {"key": "CHECKOUT-215", "issue_type": "Task", "project": "CHECKOUT", "component": "search", "labels": ["code-review"], "requester": "liam"}, "prompt": "can you review this pull request #482 for the search module"},
+  {"work_item": {"key": "CHECKOUT-216", "issue_type": "Task", "project": "CHECKOUT", "component": "auth", "labels": ["code-review"], "requester": "noor"}, "prompt": "review this diff that changes token refresh in the auth module"},
+  {"work_item": {"key": "PLAT-330", "issue_type": "Task", "project": "PLATFORM", "component": "infra", "labels": ["docs"], "requester": "noor"}, "prompt": "draft documentation for the retry configuration options"},
+  {"work_item": {"key": "PLAT-331", "issue_type": "Task", "project": "PLATFORM", "component": "infra", "labels": ["tests"], "requester": "noor"}, "prompt": "generate unit tests for the backoff calculator"},
+  {"work_item": {"key": "PLAT-332", "issue_type": "Incident", "project": "PLATFORM", "component": "infra", "requester": "raj"}, "prompt": "queue consumers are lagging, summarize the error logs from the last hour"},
+  {"work_item": {"key": "PLAT-340", "issue_type": "Story", "project": "PLATFORM", "component": "infra", "requester": "raj"}, "prompt": "draft an email to the vendor about the delayed shipment"}
+]
