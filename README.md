@@ -104,6 +104,9 @@ python -m examples.enterprise_demo
 # Where classifier confidence clusters (histogram + sensitivity sweep)
 python -m examples.confidence_histogram
 
+# Route synthetic Jira work items and see the finance view
+python -m examples.jira_routing_demo
+
 # Test suite
 pytest tests/ -v
 
@@ -228,6 +231,41 @@ requests, which compares mean confidence with actual accuracy per band. If the g
 large, fit a calibrator on the ensemble's own combined scores and pass it as
 `final_calibrator=`.
 
+## Routing on the work item, not just the prompt
+
+Most AI requests inside a software organization are attached to a work item, such as
+a Jira issue, that already says what kind of work it is. `WorkItemRouter` uses those
+fields first and the prompt second:
+
+- **Issue type or label** sets the task type and baseline tier (bug -> bug triage,
+  service request -> support, `docs` label -> documentation, and so on).
+- **Component** sets risk: high-risk components such as auth or billing go to the
+  strongest tier and are flagged for human review.
+- **The prompt classifier only refines.** The work item is trusted by default; the
+  request is escalated one tier only when the prompt confidently points to a
+  different kind of work, and the disagreement is recorded.
+- **Every field becomes a cost-attribution tag** (project, component, issue type,
+  epic, requester, work item), so finance can see spend per team and cost per issue.
+
+```python
+from src import AgentOrchestrator, WorkItem, WorkItemRouter
+
+router = WorkItemRouter(AgentOrchestrator())
+item = WorkItem(key="CHECKOUT-211", issue_type="Bug", project="CHECKOUT", component="billing")
+task = router.route(item, "invoice totals are off by one cent on refunds, find the cause")
+# task.task_type == BUG_TRIAGE, routed to the frontier tier with human review (billing)
+```
+
+Because triage sets these fields, not the person typing the prompt, writing "urgent,
+complex, production issue" doesn't buy a better model. See it end to end, including
+spend by project, component and issue type:
+
+```bash
+python -m examples.jira_routing_demo
+```
+
+All work items in `data/jira_work_items.json` are synthetic.
+
 ## Tags: cost attribution without an opinion
 
 `GovernedTask.tags` is an open `str -> str` map the engine never interprets. Callers
@@ -306,7 +344,8 @@ Ai_governance_layer/
 ├── src/
 │   ├── models.py               # TaskType, GovernedTask, TokenUsage, PriceTable
 │   ├── task_classifier.py      # 4 interchangeable classifier backends
-│   ├── calibration.py          # IsotonicCalibrator for per-backend calibration
+│   ├── calibration.py          # IsotonicCalibrator, reliability_table
+│   ├── work_item_routing.py    # route on Jira-style work items, tag spend for finance
 │   ├── agent_orchestrator.py   # routing policy, escalation, sensitivity + histogram diagnostics
 │   ├── token_tracker.py        # cost attribution by task type and tag
 │   ├── cost_governor.py        # budgets, alerts, avoided-cost modeling
@@ -315,12 +354,13 @@ Ai_governance_layer/
 ├── examples/
 │   ├── demo.py                 # end-to-end single-tenant run
 │   ├── enterprise_demo.py      # two initiatives, portfolio rollup, exceptions
-│   └── confidence_histogram.py # where classifier confidence clusters
+│   ├── confidence_histogram.py # where classifier confidence clusters
+│   └── jira_routing_demo.py    # work-item routing and the finance view
 ├── dashboard/
 │   └── index.html              # Chart.js visualization of governance data
 ├── docs/
 │   └── EXPORT_SCHEMA.md        # the integration contract
-├── tests/                      # 84 tests across all modules
+├── tests/                      # 95 tests across all modules
 ├── data/                       # synthetic sample requests
 └── .github/workflows/tests.yml # CI on Python 3.10 – 3.13
 ```
